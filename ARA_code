@@ -1,0 +1,226 @@
+#Generating dataset - error beta
+
+
+# Question 1 --------------------------------------------------------------
+
+#Qualitatif : IT, Gender, size_city
+#Quantitatif : age, body_mass, time
+
+
+# Question 2 --------------------------------------------------------------
+#size
+size<-sample(800:900, size=1)
+size
+
+#Gender child
+Gender_C<-sample(x=c("F","M"), size=size, replace=T)
+Gender_C<-as.factor(Gender_C)
+summary(Gender_C)
+
+#Gender parent
+Gender_P<-sample(x=c("F","M"), size=size, replace=T)
+Gender_P<-as.factor(Gender_P)
+summary(Gender_P)
+
+
+#age
+age_C<-sample(0:36, size=size, replace=T)
+hist(age_C)
+summary(age_C)
+age_P<-rbeta(size, shape1=2, shape2 = 2)
+age_P<-18+age_P*30
+hist(age_P)
+summary(age_P)
+
+#Size city
+size_city<-sample(x=c("small","medium","big","mega"), size=size, replace=T)
+size_city<-as.factor(size_city)
+summary(size_city)
+
+#BMI
+BMI<-rbeta(size,shape1 = 3, shape2 = 4)
+for(i in 1:size){
+  if(Gender_P[i] == "F"){
+    BMI[i]<-15+BMI[i]*15
+  } else {
+    BMI[i]<-17+BMI[i]*20
+  }
+}
+facteur_random<-runif(1,min=0,max=0.01) #might reduce for light effect
+facteur_random
+for(i in 1:size){
+  if(size_city[i]=="big" | size_city[i]=="mega"){
+    BMI[i]<-BMI[i]*(1-facteur_random)
+  }
+}
+head(BMI)
+hist(BMI)
+summary(BMI)
+
+
+# Screen time parents -----------------------------------------------------
+#GSM
+for(i in Gender_P){
+  if(i == "F"){
+    GSM_P<-rbeta(size,shape1 = 3, shape2 = 2)
+  } else {
+    GSM_P<-rbeta(size,shape1 = 2, shape2 = 2)
+  }
+}
+GSM_P<-GSM_P*8
+head(GSM_P)
+hist(GSM_P)
+summary(GSM_P)
+
+# TV
+TV_P<-rbeta(size,shape1 = 2, shape2 = 2)
+TV_P<-TV_P*8
+head(TV_P)
+hist(TV_P)
+summary(TV_P)
+
+#Computer 
+Comp_P<-rbeta(size,shape1 = 3, shape2 = 2)
+Comp_P<-Comp_P*4
+head(Comp_P)
+hist(Comp_P)
+summary(Comp_P)
+
+# Screen time child -------------------------------------------------------
+#GSM_C
+GSM_C<-NULL
+factor1<-runif(1, min=2, max=3)
+factor1
+factor2<-rnorm(size, mean=1, sd=5.5) #loi normale pour les residus
+for(i in 0:size){
+  GSM_C[i]<-factor1*age_C[i]-factor2[i]
+}
+GSM_C[which(GSM_C<0)] = 0 #pour pas avoir de négatif
+plot(age_C,GSM_C)
+summary(GSM_C)
+
+#Computer_C
+Comp_C<-NULL
+factor3<-runif(1, min=0.5, max=1)
+factor4<-rnorm(size, mean=1, sd=3) #loi normale pour les residus
+for(i in 0:size){
+  Comp_C[i]<-factor3*age_C[i]-factor4[i]
+}
+Comp_C[which(Comp_C<0)] = 0 #pour pas avoir de négatif
+plot(age_C,Comp_C)
+summary(Comp_C)
+
+#TV Enfant
+TV_C<-NULL
+TV_P_min <- TV_P*60
+factor5<-runif(1, min=0.2, max=0.3)
+factor6<-rnorm(size, mean=1, sd=6) #loi normale pour les residus
+for(i in 0:size){
+  TV_C[i]<-factor5*TV_P_min[i]-factor6[i]
+}
+TV_C[which(TV_C<0)] = 0 #pour pas avoir de négatif
+plot(TV_P,TV_C)
+summary(TV_C)
+
+
+#Creation du tableau 
+
+data<-data.frame(Gender_P,Gender_C,age_P, age_C,size_city,BMI,Comp_C, Comp_P, 
+                 GSM_C, GSM_P, TV_C, TV_P)
+write.table(x=data,file = "data_enonce11.txt",sep = "\t")
+data[,3:4]<-round(data[,3:4],2) #arrondissement des valeurs
+head(data)
+data[,6:12]<-round(data[,6:12],2)
+head(data)
+
+#------------------------------------------------------------
+# Perform the tests
+
+#1)Women use smartphone more than men (NS)
+#Qual= Gender_P
+#Quant= GSM_P
+  # exemple : chi2_test_Gender <-chisq.test(data$Gender_P)
+
+
+#Fonction pour trouver si la difference est significative ou non 
+Test_GSM_P<-function(data){
+  pval<-NULL
+  attach(data) #ATTENTION, VOIR SI POSE PB GENERATION DATA
+  norm_GSM_P<-shapiro.test(GSM_P)
+  pval_nGSMP<-as.numeric(norm_GSM_P[2])
+  if(pval_nGSMP>0.01){ #Normalite des datas respectee
+    fish_GSM_P<-var.test(GSM_P~Gender_P)  
+    pval_fGSMP<-as.numeric(fish_GSM_P[3])
+    if(pval_nGSMP>0.01){ #Homoscedasticite
+      ttest_GSM1<-t.test(GSM_P~Gender_P) #t.test parametrique
+      pval<-as.numeric(ttest_GSM[3]) #pvalue du test final 1
+    } else { 
+      ttest_GSM2<-t.test(GSM_P~Gender_P) #test de Welch (pas de difference)
+      pval<-as.numeric(ttest_GSM[3]) #pvalue du test final 2 
+    }  
+  } else{
+    MWtest_GSM<-wilcox.test(GSM_P~Gender_P,paired = F)
+    pval<-as.numeric(MWtest_GSM$p.value)
+  }
+  detach(data)
+  if(pval<0.01){
+    cat("The test is significant, p-value=", pval)
+    Res<-c("S")
+  }
+  cat("The test is NOT significant, p-value=", pval)
+  Res<-c("NS")
+}
+Test_GSM_P(data=data)
+
+
+#2)Link between Big and mega cities and BMI
+#Qual = size_city
+#Quant = BMI
+
+Test_city_BMI<-function(data){
+  pval2<-NULL
+  aov.test<-aov(BMI~size_city)
+  b.test<-bartlett.test(BMI~size_city)
+  pval_btest<-as.numeric(b.test[3])
+  s.test<-shapiro.test(aov.test$residuals)
+  pval_stest<-as.numeric(b.test[3])
+  if((pval_btest & pval_stest)>0.01){
+    anova.test<-anova(aov.test)
+    pval2<-as.numeric(anova.test$`Pr(>F)`)
+    #Test post-Hoc
+    THSD<-TukeyHSD(aov.test)
+  } else{
+    kw.test<-kruskal.test(BMI~size_city)
+    pval2<-as.numeric(kw.test$p.value)
+  }
+  cat("The test is NOT significant, p-value=", pval)
+}
+Test_city_BMI(data = data)
+
+
+#3) Correlation age_C et Comp-C + GSM_C
+cor.test()
+
+
+
+
+
+
+
+# Store the results of the tests in the list
+test_results[[i]] <- list(chi2_test = chi2_test, t_test = t_test, mann_whitney = mann_whitney)
+
+
+
+
+
+# Check the results
+for (i in 1:n_datasets) {
+  print(paste("Dataset", i))
+  print(test_results[[i]])
+}
+
+for (i in 1:100){
+  chi <- c(chi,test_results[[i]]$chi2_test$p.value)
+}
+summary(chi)
